@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Truck - Fleet Manager</title>
+</head>
+<body>
+<h1>Add a New Truck to Your Fleet</h1>
+
+<form action="/add_truck" method="POST">
+    <label for="model">Truck/Vehicle Model:</label><br>
+    <input type="text" id="model" name="model" placeholder="e.g., BYD Leopard 5 or Duramax Heavy Duty" required><br><br>
+
+    <label for="daily_rate">Daily Rental Rate ($):</label><br>
+    <input type="number" id="daily_rate" name="daily_rate" step="0.01" placeholder="150.00" required><br><br>
+
+    <input type="submit" value="Add Vehicle">
+</form>
+
+<br>
+<a href="/">Back to Home</a>
+</body>
+</html>
