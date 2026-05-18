@@ -19,17 +19,33 @@ def init_db():
         db.commit()
         print("Database initialized!")
 
-@app.route('/')
-def index():
-    db = get_db_connection()
-    trucks = db.execute('''
-        SELECT trucks.*, users.username
-        FROM trucks
-        JOIN users ON trucks.owner_id = users.id
-    ''').fetchall()
-    db.close()
-    return render_template('index.html', trucks=trucks)
+  @app.route('/')
+  def index():
+      db = get_db_connection()
+      # Get today's date in 'YYYY-MM-DD' text format
+      today_str = datetime.now().strftime('%Y-%m-%d')
 
+      # Advanced SQL: Automatically calculate live status based on today's date
+      trucks = db.execute('''
+          SELECT
+              trucks.id,
+              trucks.model,
+              trucks.daily_rate,
+              users.username,
+              CASE
+                  WHEN EXISTS (
+                      SELECT 1 FROM bookings
+                      WHERE bookings.truck_id = trucks.id
+                      AND ? BETWEEN bookings.start_date AND bookings.end_date
+                  ) THEN 'Rented'
+                  ELSE 'Available'
+              END AS status
+          FROM trucks
+          JOIN users ON trucks.owner_id = users.id
+      ''', (today_str,)).fetchall()
+
+      db.close()
+      return render_template('index.html', trucks=trucks)
 
 # ==========================================
 # USER AUTHENTICATION ROUTES
