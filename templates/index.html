@@ -2,12 +2,13 @@
 <html>
 <head>
     <title>Fleet Manager - Home</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 <h1>My Fleet Inventory</h1>
 
 {% if session.username %}
-<p>Welcome back, <strong>{{ session.username }}</strong>! | <a href="/logout">Logout</a></p>
+<p>Welcome back, <strong>{{ session.username }}</strong>! | <a href="/my_bookings">My Bookings</a> | <a href="/logout">Logout</a></p>
 <a href="/add_truck"><button>+ Add New Vehicle</button></a>
 {% else %}
 <p>You are viewing the public fleet catalog. <a href="/login">Login</a> or <a href="/register">Register</a> to add your own trucks.</p>
@@ -21,7 +22,7 @@
 {% endwith %}
 <br>
 
-<table border="1" cellpadding="10">
+<table>
     <tr>
         <th>ID</th>
         <th>Owner (Username)</th>
@@ -37,7 +38,13 @@
         <td>{{ truck['username'] }}</td>
         <td>{{ truck['model'] }}</td>
         <td>${{ "%.2f"|format(truck['daily_rate']) }}</td>
-        <td>{{ truck['status'] }}</td>
+        <td>
+            {% if truck['status'] == 'Rented' %}
+            <span style="color: #e74c3c; font-weight: bold;">Rented</span>
+            {% else %}
+            <span style="color: #2ecc71; font-weight: bold;">Available</span>
+            {% endif %}
+        </td>
         <td>
             {% if session.username %}
             <a href="/book/{{ truck['id'] }}">Book Now</a>
@@ -48,7 +55,7 @@
     </tr>
     {% else %}
     <tr>
-        <td colspan="6">No trucks found in the entire fleet network. Register an account and add one!</td>
+        <td colspan="6" style="text-align: center;">No trucks found in the entire fleet network. Register an account and add one!</td>
     </tr>
     {% endfor %}
 </table>

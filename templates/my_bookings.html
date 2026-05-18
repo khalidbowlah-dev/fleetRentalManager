@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fleet Manager - My Bookings</title>
+</head>
+<body>
+<h1>My Rental Reservation Ledger</h1>
+<p>Logged in as: <strong>{{ session.username }}</strong> | <a href="/">Return to Fleet Catalog</a></p>
+
+<br>
+
+<table border="1" cellpadding="10">
+    <tr>
+        <th>Booking ID</th>
+        <th>Vehicle Model</th>
+        <th>Daily Specification</th>
+        <th>Pick-Up Date</th>
+        <th>Return Date</th>
+        <th>Total Financial Statement</th>
+    </tr>
+
+    {% for booking in bookings %}
+    <tr>
+        <td>#{{ booking['id'] }}</td>
+        <td>{{ booking['model'] }}</td>
+        <td>${{ "%.2f"|format(booking['daily_rate']) }} / day</td>
+        <td>{{ booking['start_date'] }}</td>
+        <td>{{ booking['end_date'] }}</td>
+        <td style="color: green; font-weight: bold;">${{ "%.2f"|format(booking['total_cost']) }}</td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="6">You haven't processed any active fleet reservations yet.</td>
+    </tr>
+    {% endfor %}
+</table>
+
+</body>
+</html>

@@ -166,6 +166,30 @@ def book_truck(truck_id):
 
     db.close()
     return render_template('book.html', truck=truck)
+    # ==========================================
+    # USER RENTAL HISTORY PANEL
+    # ==========================================
+
+    @app.route('/my_bookings')
+    def my_bookings():
+        # SECURITY: Kick out users who aren't logged in
+        if 'user_id' not in session:
+            flash("Please log in to view your booking history.")
+            return redirect(url_for('login'))
+
+        db = get_db_connection()
+
+        # Grab all bookings for this user, including the truck details
+        user_bookings = db.execute('''
+            SELECT bookings.*, trucks.model, trucks.daily_rate
+            FROM bookings
+            JOIN trucks ON bookings.truck_id = trucks.id
+            WHERE bookings.renter_id = ?
+            ORDER BY bookings.start_date DESC
+        ''', (session['user_id'],)).fetchall()
+
+        db.close()
+        return render_template('my_bookings.html', bookings=user_bookings)
 
 
 if __name__ == '__main__':
