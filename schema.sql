@@ -1,5 +1,6 @@
-DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS bookings;
 DROP TABLE IF EXISTS trucks;
+DROP TABLE IF EXISTS users;
 
 -- Table for customer accounts
 CREATE TABLE users (

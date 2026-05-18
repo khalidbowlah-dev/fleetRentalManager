@@ -13,7 +13,13 @@
 <p>You are viewing the public fleet catalog. <a href="/login">Login</a> or <a href="/register">Register</a> to add your own trucks.</p>
 {% endif %}
 
-<br><br>
+<br>
+{% with messages = get_flashed_messages() %}
+{% if messages %}
+<p style="color: green; font-weight: bold;">{{ messages[0] }}</p>
+{% endif %}
+{% endwith %}
+<br>
 
 <table border="1" cellpadding="10">
     <tr>
@@ -22,6 +28,7 @@
         <th>Model</th>
         <th>Daily Rate</th>
         <th>Status</th>
+        <th>Action</th>
     </tr>
 
     {% for truck in trucks %}
@@ -31,10 +38,17 @@
         <td>{{ truck['model'] }}</td>
         <td>${{ "%.2f"|format(truck['daily_rate']) }}</td>
         <td>{{ truck['status'] }}</td>
+        <td>
+            {% if session.username %}
+            <a href="/book/{{ truck['id'] }}">Book Now</a>
+            {% else %}
+            <a href="/login">Login to Book</a>
+            {% endif %}
+        </td>
     </tr>
     {% else %}
     <tr>
-        <td colspan="5">No trucks found in the entire fleet network. Register an account and add one!</td>
+        <td colspan="6">No trucks found in the entire fleet network. Register an account and add one!</td>
     </tr>
     {% endfor %}
 </table>

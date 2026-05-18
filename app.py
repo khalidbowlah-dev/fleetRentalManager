@@ -1,9 +1,9 @@
 import sqlite3
+from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-# This secret key is required to keep user sessions secure!
 app.config['SECRET_KEY'] = 'your_super_secret_key_here'
 
 def get_db_connection():
@@ -22,7 +22,6 @@ def init_db():
 @app.route('/')
 def index():
     db = get_db_connection()
-    # Updated SQL: We grab the trucks AND the username of the person who owns it
     trucks = db.execute('''
         SELECT trucks.*, users.username
         FROM trucks
@@ -33,7 +32,7 @@ def index():
 
 
 # ==========================================
-# NEW USER AUTHENTICATION ROUTES
+# USER AUTHENTICATION ROUTES
 # ==========================================
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -41,8 +40,6 @@ def register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-
-        # Scramble the password for security before saving
         hashed_password = generate_password_hash(password)
 
         db = get_db_connection()
@@ -50,21 +47,16 @@ def register():
             db.execute('INSERT INTO users (username, password) VALUES (?, ?)',
                        (username, hashed_password))
             db.commit()
-
-            # Automatically log the user in after they register
             user = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
             session['user_id'] = user['id']
             session['username'] = user['username']
             return redirect(url_for('index'))
-
         except sqlite3.IntegrityError:
             flash("That username is already taken!")
             return redirect(url_for('register'))
         finally:
             db.close()
-
     return render_template('register.html')
-
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -76,30 +68,26 @@ def login():
         user = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
         db.close()
 
-        # Check if user exists AND the password matches the saved secure hash
         if user and check_password_hash(user['password'], password):
             session['user_id'] = user['id']
             session['username'] = user['username']
             return redirect(url_for('index'))
         else:
             flash("Invalid username or password")
-
     return render_template('login.html')
-
 
 @app.route('/logout')
 def logout():
-    session.clear() # Erase the user's login session
+    session.clear()
     return redirect(url_for('index'))
 
 
 # ==========================================
-# UPDATED ADD TRUCK ROUTE
+# VEHICLE MANAGEMENT ROUTES
 # ==========================================
 
 @app.route('/add_truck', methods=['GET', 'POST'])
 def add_truck():
-    # SECURITY: Kick the user back to the login page if they aren't signed in!
     if 'user_id' not in session:
         flash("You must be logged in to add a vehicle.")
         return redirect(url_for('login'))
@@ -108,18 +96,62 @@ def add_truck():
         model = request.form['model']
         daily_rate = request.form['daily_rate']
 
-        # Save the new truck, dynamically linked to whoever is currently logged in
         db = get_db_connection()
         db.execute('INSERT INTO trucks (owner_id, model, daily_rate) VALUES (?, ?, ?)',
                    (session['user_id'], model, daily_rate))
         db.commit()
         db.close()
-
         return redirect(url_for('index'))
-
     return render_template('add_truck.html')
 
 
+# ==========================================
+# NEW BOOKING ENGINE TRANSACTION ROUTE
+# ==========================================
+
+@app.route('/book/<int:truck_id>', methods=['GET', 'POST'])
+def book_truck(truck_id):
+    if 'user_id' not in session:
+        flash("You must log in to reserve a heavy-duty truck.")
+        return redirect(url_for('login'))
+
+    db = get_db_connection()
+    truck = db.execute('SELECT * FROM trucks WHERE id = ?', (truck_id,)).fetchone()
+
+    if request.method == 'POST':
+        start_str = request.form['start_date']
+        end_str = request.form['end_date']
+
+        # Turn the input text strings back into Python date objects
+        start_date = datetime.strptime(start_str, '%Y-%m-%d')
+        end_date = datetime.strptime(end_str, '%Y-%m-%d')
+
+        # Business logic: Calculate total delta days
+        days = (end_date - start_date).days
+
+        if days <= 0:
+            flash("End date must be at least 1 day after the start date!")
+            db.close()
+            return redirect(url_for('book_truck', truck_id=truck_id))
+
+        total_cost = days * truck['daily_rate']
+
+        # Save transaction data to the SQLite database ledger
+        db.execute('''
+            INSERT INTO bookings (truck_id, renter_id, start_date, end_date, total_cost)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (truck_id, session['user_id'], start_str, end_str, total_cost))
+
+        db.commit()
+        db.close()
+
+        flash(f"Success! Booked for {days} days. Total: ${total_cost:.2f}")
+        return redirect(url_for('index'))
+
+    db.close()
+    return render_template('book.html', truck=truck)
+
+
 if __name__ == '__main__':
-   # init_db()
+    # init_db()
     app.run(debug=True)

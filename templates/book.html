@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fleet Manager - Book Truck</title>
+</head>
+<body>
+<h1>Reserve Vehicle: {{ truck['model'] }}</h1>
+<p>Rate Specification: <strong>${{ "%.2f"|format(truck['daily_rate']) }} / day</strong></p>
+
+{% with messages = get_flashed_messages() %}
+{% if messages %}
+<p style="color: red;">{{ messages[0] }}</p>
+{% endif %}
+{% endwith %}
+
+<form action="/book/{{ truck['id'] }}" method="POST">
+    <label>Pick-Up Date:</label><br>
+    <input type="date" name="start_date" required><br><br>
+
+    <label>Return Date:</label><br>
+    <input type="date" name="end_date" required><br><br>
+
+    <button type="submit">Confirm Rental Agreement</button>
+</form>
+
+<br>
+<a href="/">Cancel and Return Home</a>
+</body>
+</html>
