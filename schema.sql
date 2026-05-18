@@ -17,3 +17,14 @@ CREATE TABLE trucks (
                         status TEXT DEFAULT 'Available',
                         FOREIGN KEY (owner_id) REFERENCES users (id)
 );
+-- Table to store real truck rentals
+CREATE TABLE bookings (
+                          id INTEGER PRIMARY KEY AUTOINCREMENT,
+                          truck_id INTEGER NOT NULL,
+                          renter_id INTEGER NOT NULL,
+                          start_date TEXT NOT NULL,
+                          end_date TEXT NOT NULL,
+                          total_cost REAL NOT NULL,
+                          FOREIGN KEY (truck_id) REFERENCES trucks (id),
+                          FOREIGN KEY (renter_id) REFERENCES users (id)
+);
