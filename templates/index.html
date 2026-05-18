@@ -6,12 +6,19 @@
 <body>
 <h1>My Fleet Inventory</h1>
 
+{% if session.username %}
+<p>Welcome back, <strong>{{ session.username }}</strong>! | <a href="/logout">Logout</a></p>
 <a href="/add_truck"><button>+ Add New Vehicle</button></a>
+{% else %}
+<p>You are viewing the public fleet catalog. <a href="/login">Login</a> or <a href="/register">Register</a> to add your own trucks.</p>
+{% endif %}
+
 <br><br>
 
 <table border="1" cellpadding="10">
     <tr>
         <th>ID</th>
+        <th>Owner (Username)</th>
         <th>Model</th>
         <th>Daily Rate</th>
         <th>Status</th>
@@ -20,13 +27,14 @@
     {% for truck in trucks %}
     <tr>
         <td>{{ truck['id'] }}</td>
+        <td>{{ truck['username'] }}</td>
         <td>{{ truck['model'] }}</td>
         <td>${{ "%.2f"|format(truck['daily_rate']) }}</td>
         <td>{{ truck['status'] }}</td>
     </tr>
     {% else %}
     <tr>
-        <td colspan="4">No trucks found. Add one to get started!</td>
+        <td colspan="5">No trucks found in the entire fleet network. Register an account and add one!</td>
     </tr>
     {% endfor %}
 </table>
