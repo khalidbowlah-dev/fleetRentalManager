@@ -1,22 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Add Truck - Fleet Manager</title>
+    <title>Fleet Manager - Add Truck</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<h1>Add a New Truck to Your Fleet</h1>
+<h1>Add New Vehicle to Fleet</h1>
 
 <form action="/add_truck" method="POST">
-    <label for="model">Truck/Vehicle Model:</label><br>
-    <input type="text" id="model" name="model" placeholder="e.g., BYD Leopard 5 or Duramax Heavy Duty" required><br><br>
+    <label>Vehicle Specification / Model:</label>
+    <input type="text" name="model" placeholder="e.g., GMC Sierra HD, BYD Leopard" required>
 
-    <label for="daily_rate">Daily Rental Rate ($):</label><br>
-    <input type="number" id="daily_rate" name="daily_rate" step="0.01" placeholder="150.00" required><br><br>
+    <label>Daily Rental Rate ($):</label>
+    <input type="number" name="daily_rate" step="0.01" placeholder="e.g., 150.00" required>
 
-    <input type="submit" value="Add Vehicle">
+    <button type="submit">Publish Vehicle Listing</button>
 </form>
 
 <br>
-<a href="/">Back to Home</a>
+<a href="/">Cancel and Return Home</a>
 </body>
 </html>

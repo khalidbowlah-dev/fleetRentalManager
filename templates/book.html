@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Fleet Manager - Book Truck</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 <h1>Reserve Vehicle: {{ truck['model'] }}</h1>
@@ -14,11 +15,11 @@
 {% endwith %}
 
 <form action="/book/{{ truck['id'] }}" method="POST">
-    <label>Pick-Up Date:</label><br>
-    <input type="date" name="start_date" required><br><br>
+    <label>Pick-Up Date:</label>
+    <input type="date" name="start_date" required>
 
-    <label>Return Date:</label><br>
-    <input type="date" name="end_date" required><br><br>
+    <label>Return Date:</label>
+    <input type="date" name="end_date" required>
 
     <button type="submit">Confirm Rental Agreement</button>
 </form>

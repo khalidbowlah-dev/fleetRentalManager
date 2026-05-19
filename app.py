@@ -19,8 +19,8 @@ def init_db():
         db.commit()
         print("Database initialized!")
 
-  @app.route('/')
-  def index():
+@app.route('/')
+def index():
       db = get_db_connection()
       # Get today's date in 'YYYY-MM-DD' text format
       today_str = datetime.now().strftime('%Y-%m-%d')

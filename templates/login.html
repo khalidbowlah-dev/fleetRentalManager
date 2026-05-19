@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Fleet Manager - Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 <h1>Login to Fleet Manager</h1>
@@ -13,11 +14,11 @@
 {% endwith %}
 
 <form action="/login" method="POST">
-    <label>Username:</label><br>
-    <input type="text" name="username" required><br><br>
+    <label>Username:</label>
+    <input type="text" name="username" required>
 
-    <label>Password:</label><br>
-    <input type="password" name="password" required><br><br>
+    <label>Password:</label>
+    <input type="password" name="password" required>
 
     <button type="submit">Log In</button>
 </form>
