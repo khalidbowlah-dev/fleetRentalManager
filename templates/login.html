@@ -5,24 +5,25 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<h1>Login to Fleet Manager</h1>
+<h1>Login</h1>
 
 {% with messages = get_flashed_messages() %}
 {% if messages %}
-<p style="color: red;">{{ messages[0] }}</p>
+<p style="color: red; font-weight: bold;">{{ messages[0] }}</p>
 {% endif %}
 {% endwith %}
 
 <form action="/login" method="POST">
     <label>Username:</label>
-    <input type="text" name="username" required>
+    <input type="text" name="username" autocomplete="off" required>
 
     <label>Password:</label>
-    <input type="password" name="password" required>
+    <input type="password" name="password" autocomplete="off" required>
 
-    <button type="submit">Log In</button>
+    <button type="submit">Login</button>
 </form>
 
-<p>Don't have an account yet? <a href="/register">Register here</a>.</p>
+<br>
+<a href="/register">Don't have an account? Register here.</a>
 </body>
 </html>
