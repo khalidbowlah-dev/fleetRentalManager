@@ -1,51 +1,98 @@
-import sqlite3
-from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
+import sqlite3
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your_super_secret_key_here'
+app.secret_key = 'super_secret_fleet_key'
 
 def get_db_connection():
     conn = sqlite3.connect('database.db')
     conn.row_factory = sqlite3.Row
     return conn
 
-def init_db():
-    with app.app_context():
-        db = get_db_connection()
-        with app.open_resource('schema.sql', mode='r') as f:
-            db.cursor().executescript(f.read())
-        db.commit()
-        print("Database initialized!")
+# ==========================================
+# WELCOME & PUBLIC CATALOG ROUTES
+# ==========================================
 
 @app.route('/')
-def index():
-      db = get_db_connection()
-      # Get today's date in 'YYYY-MM-DD' text format
-      today_str = datetime.now().strftime('%Y-%m-%d')
+def welcome():
+    return render_template('welcome.html')
 
-      # Advanced SQL: Automatically calculate live status based on today's date
-      trucks = db.execute('''
-          SELECT
-              trucks.id,
-              trucks.model,
-              trucks.daily_rate,
-              users.username,
-              CASE
-                  WHEN EXISTS (
-                      SELECT 1 FROM bookings
-                      WHERE bookings.truck_id = trucks.id
-                      AND ? BETWEEN bookings.start_date AND bookings.end_date
-                  ) THEN 'Rented'
-                  ELSE 'Available'
-              END AS status
-          FROM trucks
-          JOIN users ON trucks.owner_id = users.id
-      ''', (today_str,)).fetchall()
+@app.route('/catalog')
+def catalog():
+    db = get_db_connection()
+    today_str = datetime.now().strftime('%Y-%m-%d')
 
-      db.close()
-      return render_template('index.html', trucks=trucks)
+    trucks = db.execute('''
+        SELECT
+            t.id, t.model, t.daily_rate, u.username, t.is_maintenance,
+            (SELECT MAX(end_date) FROM bookings WHERE truck_id = t.id AND end_date >= ?) AS return_date,
+            CASE
+                WHEN t.is_maintenance = 1 THEN 'Maintenance'
+                WHEN EXISTS (SELECT 1 FROM bookings WHERE truck_id = t.id AND end_date >= ?) THEN 'Rented'
+                ELSE 'Available'
+            END AS status
+        FROM trucks t
+        JOIN users u ON t.owner_id = u.id
+    ''', (today_str, today_str)).fetchall()
+
+    is_owner = False
+    if 'user_id' in session:
+        truck_count = db.execute('SELECT COUNT(*) FROM trucks WHERE owner_id = ?', (session['user_id'],)).fetchone()[0]
+        if truck_count > 0:
+            is_owner = True
+
+    db.close()
+    return render_template('catalog.html', trucks=trucks, is_owner=is_owner)
+
+# ==========================================
+# OWNER DASHBOARD ROUTE
+# ==========================================
+
+@app.route('/dashboard')
+def dashboard():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    db = get_db_connection()
+    today_str = datetime.now().strftime('%Y-%m-%d')
+
+    # FIX: Added WHERE t.owner_id = ? so owners ONLY see their own vehicles
+    trucks = db.execute('''
+        SELECT
+            t.id, t.model, t.daily_rate, u.username, t.is_maintenance,
+            (SELECT MAX(end_date) FROM bookings WHERE truck_id = t.id AND end_date >= ?) AS return_date,
+            CASE
+                WHEN t.is_maintenance = 1 THEN 'Maintenance'
+                WHEN EXISTS (SELECT 1 FROM bookings WHERE truck_id = t.id AND end_date >= ?) THEN 'Rented'
+                ELSE 'Available'
+            END AS status
+        FROM trucks t
+        JOIN users u ON t.owner_id = u.id
+        WHERE t.owner_id = ?
+    ''', (today_str, today_str, session['user_id'])).fetchall()
+
+    owner_bookings = db.execute('''
+        SELECT b.id, t.model, u.username AS renter_name, b.start_date, b.end_date, b.total_cost
+        FROM bookings b
+        JOIN trucks t ON b.truck_id = t.id
+        JOIN users u ON b.renter_id = u.id
+        WHERE t.owner_id = ?
+        ORDER BY b.start_date DESC
+    ''', (session['user_id'],)).fetchall()
+
+    total_revenue = sum([b['total_cost'] for b in owner_bookings])
+
+    stats = {'total': 0, 'available': 0, 'rented': 0, 'maintenance': 0, 'revenue': total_revenue}
+    for truck in trucks:
+        stats['total'] += 1
+        if truck['status'] == 'Available': stats['available'] += 1
+        elif truck['status'] == 'Rented': stats['rented'] += 1
+        elif truck['status'] == 'Maintenance': stats['maintenance'] += 1
+
+    db.close()
+    return render_template('index.html', trucks=trucks, stats=stats, owner_bookings=owner_bookings)
 
 # ==========================================
 # USER AUTHENTICATION ROUTES
@@ -56,22 +103,26 @@ def register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        hashed_password = generate_password_hash(password)
 
         db = get_db_connection()
-        try:
-            db.execute('INSERT INTO users (username, password) VALUES (?, ?)',
-                       (username, hashed_password))
-            db.commit()
-            user = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
-            session['user_id'] = user['id']
-            session['username'] = user['username']
-            return redirect(url_for('index'))
-        except sqlite3.IntegrityError:
-            flash("That username is already taken!")
+        user_exists = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+
+        if user_exists:
+            flash("Error: Username already taken!")
             return redirect(url_for('register'))
-        finally:
-            db.close()
+
+        hashed_pw = generate_password_hash(password)
+        db.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, hashed_pw))
+        db.commit()
+
+        user = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+        session['user_id'] = user['id']
+        session['username'] = user['username']
+        db.close()
+
+        flash("Registration successful! Welcome to the Fleet Manager.")
+        return redirect(url_for('catalog'))
+
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -82,53 +133,63 @@ def login():
 
         db = get_db_connection()
         user = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
-        db.close()
 
         if user and check_password_hash(user['password'], password):
             session['user_id'] = user['id']
             session['username'] = user['username']
-            return redirect(url_for('index'))
+
+            truck_count = db.execute('SELECT COUNT(*) FROM trucks WHERE owner_id = ?', (user['id'],)).fetchone()[0]
+            db.close()
+
+            if truck_count > 0:
+                return redirect(url_for('dashboard'))
+            else:
+                return redirect(url_for('catalog'))
         else:
-            flash("Invalid username or password")
+            db.close()
+            flash("Error: Invalid username or password.")
+            return redirect(url_for('login'))
+
     return render_template('login.html')
 
 @app.route('/logout')
 def logout():
     session.clear()
-    return redirect(url_for('index'))
-
+    return redirect(url_for('welcome'))
 
 # ==========================================
-# VEHICLE MANAGEMENT ROUTES
+# VEHICLE MANAGEMENT ROUTE
 # ==========================================
 
 @app.route('/add_truck', methods=['GET', 'POST'])
 def add_truck():
     if 'user_id' not in session:
-        flash("You must be logged in to add a vehicle.")
+        flash("Please log in to add a truck.")
         return redirect(url_for('login'))
 
     if request.method == 'POST':
         model = request.form['model']
-        daily_rate = request.form['daily_rate']
+        daily_rate = float(request.form['daily_rate'])
 
         db = get_db_connection()
-        db.execute('INSERT INTO trucks (owner_id, model, daily_rate) VALUES (?, ?, ?)',
-                   (session['user_id'], model, daily_rate))
+        db.execute('INSERT INTO trucks (model, daily_rate, owner_id) VALUES (?, ?, ?)',
+                   (model, daily_rate, session['user_id']))
         db.commit()
         db.close()
-        return redirect(url_for('index'))
+
+        flash(f"Successfully added {model} to the fleet!")
+        return redirect(url_for('dashboard'))
+
     return render_template('add_truck.html')
 
-
 # ==========================================
-# NEW BOOKING ENGINE TRANSACTION ROUTE
+# BOOKING ENGINE ROUTE
 # ==========================================
 
 @app.route('/book/<int:truck_id>', methods=['GET', 'POST'])
 def book_truck(truck_id):
     if 'user_id' not in session:
-        flash("You must log in to reserve a heavy-duty truck.")
+        flash("Please log in to book a vehicle.")
         return redirect(url_for('login'))
 
     db = get_db_connection()
@@ -138,11 +199,8 @@ def book_truck(truck_id):
         start_str = request.form['start_date']
         end_str = request.form['end_date']
 
-        # Turn the input text strings back into Python date objects
         start_date = datetime.strptime(start_str, '%Y-%m-%d')
         end_date = datetime.strptime(end_str, '%Y-%m-%d')
-
-        # Business logic: Calculate total delta days
         days = (end_date - start_date).days
 
         if days <= 0:
@@ -150,48 +208,153 @@ def book_truck(truck_id):
             db.close()
             return redirect(url_for('book_truck', truck_id=truck_id))
 
+        conflict = db.execute('''
+            SELECT 1 FROM bookings
+            WHERE truck_id = ?
+            AND NOT (? >= end_date OR ? <= start_date)
+        ''', (truck_id, start_str, end_str)).fetchone()
+
+        if conflict:
+            flash("Error: This truck is already reserved during those specific dates!")
+            db.close()
+            return redirect(url_for('book_truck', truck_id=truck_id))
+
         total_cost = days * truck['daily_rate']
 
-        # Save transaction data to the SQLite database ledger
-        db.execute('''
-            INSERT INTO bookings (truck_id, renter_id, start_date, end_date, total_cost)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (truck_id, session['user_id'], start_str, end_str, total_cost))
-
+        db.execute('INSERT INTO bookings (truck_id, renter_id, start_date, end_date, total_cost) VALUES (?, ?, ?, ?, ?)',
+                   (truck_id, session['user_id'], start_str, end_str, total_cost))
         db.commit()
         db.close()
 
         flash(f"Success! Booked for {days} days. Total: ${total_cost:.2f}")
-        return redirect(url_for('index'))
+        return redirect(url_for('my_bookings'))
 
     db.close()
     return render_template('book.html', truck=truck)
-    # ==========================================
-    # USER RENTAL HISTORY PANEL
-    # ==========================================
 
-    @app.route('/my_bookings')
-    def my_bookings():
-        # SECURITY: Kick out users who aren't logged in
-        if 'user_id' not in session:
-            flash("Please log in to view your booking history.")
-            return redirect(url_for('login'))
+# ==========================================
+# USER RENTAL HISTORY PANEL
+# ==========================================
 
-        db = get_db_connection()
+@app.route('/my_bookings')
+def my_bookings():
+    if 'user_id' not in session:
+        flash("Please log in to view your booking history.")
+        return redirect(url_for('login'))
 
-        # Grab all bookings for this user, including the truck details
-        user_bookings = db.execute('''
-            SELECT bookings.*, trucks.model, trucks.daily_rate
-            FROM bookings
-            JOIN trucks ON bookings.truck_id = trucks.id
-            WHERE bookings.renter_id = ?
-            ORDER BY bookings.start_date DESC
-        ''', (session['user_id'],)).fetchall()
+    db = get_db_connection()
+    user_bookings = db.execute('''
+        SELECT bookings.*, trucks.model, trucks.daily_rate
+        FROM bookings
+        JOIN trucks ON bookings.truck_id = trucks.id
+        WHERE bookings.renter_id = ?
+        ORDER BY bookings.start_date DESC
+    ''', (session['user_id'],)).fetchall()
 
+    is_owner = False
+    truck_count = db.execute('SELECT COUNT(*) FROM trucks WHERE owner_id = ?', (session['user_id'],)).fetchone()[0]
+    if truck_count > 0:
+        is_owner = True
+
+    db.close()
+    return render_template('my_bookings.html', bookings=user_bookings, is_owner=is_owner)
+
+# ==========================================
+# CRUD: UPDATE & DELETE ROUTES
+# ==========================================
+
+@app.route('/edit_truck/<int:truck_id>', methods=['GET', 'POST'])
+def edit_truck(truck_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    db = get_db_connection()
+    truck = db.execute('SELECT * FROM trucks WHERE id = ? AND owner_id = ?', (truck_id, session['user_id'])).fetchone()
+
+    if not truck:
+        flash("Error: You can only edit vehicles that you own.")
         db.close()
-        return render_template('my_bookings.html', bookings=user_bookings)
+        return redirect(url_for('dashboard'))
 
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    is_rented = db.execute('SELECT 1 FROM bookings WHERE truck_id = ? AND end_date >= ?', (truck_id, today_str)).fetchone()
+
+    if is_rented:
+        flash("Error: You cannot modify the rate of a vehicle while it is currently rented!")
+        db.close()
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        new_rate = request.form['daily_rate']
+        db.execute('UPDATE trucks SET daily_rate = ? WHERE id = ?', (new_rate, truck_id))
+        db.commit()
+        db.close()
+        flash("Success: Vehicle daily rate updated!")
+        return redirect(url_for('dashboard'))
+
+    db.close()
+    return render_template('edit_truck.html', truck=truck)
+
+@app.route('/delete_truck/<int:truck_id>', methods=['POST'])
+def delete_truck(truck_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    db = get_db_connection()
+    truck = db.execute('SELECT * FROM trucks WHERE id = ? AND owner_id = ?', (truck_id, session['user_id'])).fetchone()
+
+    if not truck:
+        db.close()
+        return redirect(url_for('dashboard'))
+
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    is_rented = db.execute('SELECT 1 FROM bookings WHERE truck_id = ? AND end_date >= ?', (truck_id, today_str)).fetchone()
+
+    if is_rented:
+        flash("Error: You cannot delete a vehicle while it is currently rented by a customer!")
+        db.close()
+        return redirect(url_for('dashboard'))
+
+    db.execute('DELETE FROM trucks WHERE id = ? AND owner_id = ?', (truck_id, session['user_id']))
+    db.execute('DELETE FROM bookings WHERE truck_id = ?', (truck_id,))
+    db.commit()
+    db.close()
+
+    flash("Vehicle successfully removed from the fleet.")
+    return redirect(url_for('dashboard'))
+
+@app.route('/toggle_maintenance/<int:truck_id>', methods=['POST'])
+def toggle_maintenance(truck_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    db = get_db_connection()
+    truck = db.execute('SELECT is_maintenance FROM trucks WHERE id = ? AND owner_id = ?', (truck_id, session['user_id'])).fetchone()
+
+    if truck:
+        new_status = 0 if truck['is_maintenance'] else 1
+        db.execute('UPDATE trucks SET is_maintenance = ? WHERE id = ?', (new_status, truck_id))
+        db.commit()
+        status_msg = "offline for Maintenance" if new_status else "back online and Available"
+        flash(f"Vehicle status updated: It is now {status_msg}.")
+
+    db.close()
+    return redirect(url_for('dashboard'))
+
+# ==========================================
+# AUTO-BUILD DATABASE FUNCTION
+# ==========================================
+def auto_setup_db():
+    conn = sqlite3.connect('database.db')
+    try:
+        conn.execute('SELECT 1 FROM trucks')
+    except sqlite3.OperationalError:
+        print("Building fresh database tables...")
+        with open('schema.sql') as f:
+            conn.executescript(f.read())
+    conn.commit()
+    conn.close()
 
 if __name__ == '__main__':
-    # init_db()
+    auto_setup_db()
     app.run(debug=True)
