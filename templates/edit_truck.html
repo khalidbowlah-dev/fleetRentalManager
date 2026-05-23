@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fleet Manager - Edit Vehicle</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<h1>Edit Vehicle: {{ truck['model'] }}</h1>
+
+<form action="/edit_truck/{{ truck['id'] }}" method="POST">
+    <label>Update Daily Rental Rate ($):</label>
+    <input type="number" step="0.01" name="daily_rate" value="{{ truck['daily_rate'] }}" required>
+
+    <button type="submit">Save Changes</button>
+</form>
+
+<br>
+<a href="/dashboard">Cancel and Return to Dashboard</a>
+</body>
+</html>
