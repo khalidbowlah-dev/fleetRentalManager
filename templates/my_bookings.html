@@ -2,35 +2,43 @@
 <html>
 <head>
     <title>Fleet Manager - My Bookings</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<h1>My Rental Reservation Ledger</h1>
-<p>Logged in as: <strong>{{ session.username }}</strong> | <a href="/">Return to Fleet Catalog</a></p>
+<h1>My Rental History</h1>
+
+<p>Logged in as: <strong>{{ session.username }}</strong>
+
+    {% if is_owner %}
+    | <a href="/dashboard">Return to Dashboard</a>
+    {% endif %}
+
+    | <a href="/catalog">View Fleet Catalog</a> | <a href="/logout">Logout</a></p>
 
 <br>
 
-<table border="1" cellpadding="10">
+<table>
     <tr>
         <th>Booking ID</th>
         <th>Vehicle Model</th>
-        <th>Daily Specification</th>
+        <th>Daily Rate</th>
         <th>Pick-Up Date</th>
         <th>Return Date</th>
-        <th>Total Financial Statement</th>
+        <th>Total Cost</th>
     </tr>
 
     {% for booking in bookings %}
     <tr>
-        <td>#{{ booking['id'] }}</td>
+        <td>{{ booking['id'] }}</td>
         <td>{{ booking['model'] }}</td>
-        <td>${{ "%.2f"|format(booking['daily_rate']) }} / day</td>
+        <td>${{ "%.2f"|format(booking['daily_rate']) }}</td>
         <td>{{ booking['start_date'] }}</td>
         <td>{{ booking['end_date'] }}</td>
-        <td style="color: green; font-weight: bold;">${{ "%.2f"|format(booking['total_cost']) }}</td>
+        <td style="color: #2ecc71; font-weight: bold;">${{ "%.2f"|format(booking['total_cost']) }}</td>
     </tr>
     {% else %}
     <tr>
-        <td colspan="6">You haven't processed any active fleet reservations yet.</td>
+        <td colspan="6" style="text-align: center;">You have not made any active fleet reservations yet. Go to the catalog to book a vehicle!</td>
     </tr>
     {% endfor %}
 </table>
