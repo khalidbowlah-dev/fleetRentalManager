@@ -223,7 +223,7 @@ def logout():
 
 # ==========================================
 # VEHICLE MANAGEMENT ROUTE
-# ==========================================
+# [US1] Fleet Inventory Route: Handles creating new vehicles
 
 @app.route('/add_truck', methods=['GET', 'POST'])
 def add_truck():
