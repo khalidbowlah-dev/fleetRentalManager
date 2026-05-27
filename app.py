@@ -247,8 +247,8 @@ def add_truck():
     return render_template('add_truck.html')
 
 # ==========================================
-# BOOKING ENGINE ROUTE
-# ==========================================
+# BOOKING ENGINE
+# [US2] Prevent Overlapping Bookings: Checks database for date conflicts
 
 @app.route('/book/<int:truck_id>', methods=['GET', 'POST'])
 def book_truck(truck_id):
