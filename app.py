@@ -287,6 +287,7 @@ def book_truck(truck_id):
             flash("Error: This truck is already reserved during those specific dates!")
             db.close()
             return redirect(url_for('book_truck', truck_id=truck_id))
+# [US3] Dynamic Cost Calculation: Multiplies daily rate by total days
 
         total_cost = days * truck['daily_rate']
 
