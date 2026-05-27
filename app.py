@@ -39,8 +39,7 @@ def catalog():
 
     is_owner = False
     if 'user_id' in session:
-        truck_count = db.execute('SELECT COUNT(*) FROM trucks WHERE owner_id = ?', (session['user_id'],)).fetchone()[0]
-        if truck_count > 0:
+        if session.get('role') == 'owner':
             is_owner = True
 
     db.close()
@@ -53,12 +52,11 @@ def catalog():
 @app.route('/dashboard')
 def dashboard():
     if 'user_id' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('login_owner'))
 
     db = get_db_connection()
     today_str = datetime.now().strftime('%Y-%m-%d')
 
-    # FIX: Added WHERE t.owner_id = ? so owners ONLY see their own vehicles
     trucks = db.execute('''
         SELECT
             t.id, t.model, t.daily_rate, u.username, t.is_maintenance,
@@ -95,38 +93,73 @@ def dashboard():
     return render_template('index.html', trucks=trucks, stats=stats, owner_bookings=owner_bookings)
 
 # ==========================================
-# USER AUTHENTICATION ROUTES
+# USER AUTHENTICATION ROUTES (SPLIT)
 # ==========================================
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
+@app.route('/register_owner', methods=['GET', 'POST'])
+def register_owner():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+        role = 'owner'
 
         db = get_db_connection()
         user_exists = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
 
         if user_exists:
             flash("Error: Username already taken!")
-            return redirect(url_for('register'))
+            db.close()
+            return redirect(url_for('register_owner'))
 
         hashed_pw = generate_password_hash(password)
-        db.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, hashed_pw))
+        db.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', (username, hashed_pw, role))
         db.commit()
 
         user = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
         session['user_id'] = user['id']
         session['username'] = user['username']
+        session['role'] = user['role']
         db.close()
 
         flash("Registration successful! Welcome to the Fleet Manager.")
+        return redirect(url_for('dashboard'))
+
+    return render_template('register_owner.html')
+
+@app.route('/register_customer', methods=['GET', 'POST'])
+def register_customer():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        role = 'customer'
+
+        db = get_db_connection()
+        user_exists = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+
+        if user_exists:
+            flash("Error: Username already taken!")
+            db.close()
+            return redirect(url_for('register_customer'))
+
+        hashed_pw = generate_password_hash(password)
+        db.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', (username, hashed_pw, role))
+        db.commit()
+
+        user = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+        session['user_id'] = user['id']
+        session['username'] = user['username']
+        session['role'] = user['role']
+        db.close()
+
+        flash("Registration successful! Welcome to the Fleet Catalog.")
         return redirect(url_for('catalog'))
 
-    return render_template('register.html')
+    return render_template('register_customer.html')
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
+# --- SPLIT LOGIN ROUTES ---
+
+@app.route('/login_owner', methods=['GET', 'POST'])
+def login_owner():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
@@ -135,22 +168,53 @@ def login():
         user = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
 
         if user and check_password_hash(user['password'], password):
-            session['user_id'] = user['id']
-            session['username'] = user['username']
-
-            truck_count = db.execute('SELECT COUNT(*) FROM trucks WHERE owner_id = ?', (user['id'],)).fetchone()[0]
-            db.close()
-
-            if truck_count > 0:
+            # STRICT SECURITY CHECK: Only allow true Owners!
+            if user['role'] == 'owner':
+                session['user_id'] = user['id']
+                session['username'] = user['username']
+                session['role'] = user['role']
+                db.close()
                 return redirect(url_for('dashboard'))
             else:
-                return redirect(url_for('catalog'))
+                db.close()
+                flash("Access Denied: This is a Customer account. Please register a new account to become an Owner.")
+                return redirect(url_for('login_owner'))
         else:
             db.close()
             flash("Error: Invalid username or password.")
-            return redirect(url_for('login'))
+            return redirect(url_for('login_owner'))
 
-    return render_template('login.html')
+    return render_template('login_owner.html')
+
+
+@app.route('/login_customer', methods=['GET', 'POST'])
+def login_customer():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        db = get_db_connection()
+        user = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+
+        if user and check_password_hash(user['password'], password):
+            # STRICT SECURITY CHECK: Only allow true Customers!
+            if user['role'] == 'customer':
+                session['user_id'] = user['id']
+                session['username'] = user['username']
+                session['role'] = user['role']
+                db.close()
+                return redirect(url_for('catalog'))
+            else:
+                db.close()
+                flash("Access Denied: This is an Owner account. Please use the Owner Login portal.")
+                return redirect(url_for('login_customer'))
+        else:
+            db.close()
+            flash("Error: Invalid username or password.")
+            return redirect(url_for('login_customer'))
+
+    return render_template('login_customer.html')
+
 
 @app.route('/logout')
 def logout():
@@ -165,7 +229,7 @@ def logout():
 def add_truck():
     if 'user_id' not in session:
         flash("Please log in to add a truck.")
-        return redirect(url_for('login'))
+        return redirect(url_for('login_owner'))
 
     if request.method == 'POST':
         model = request.form['model']
@@ -190,7 +254,12 @@ def add_truck():
 def book_truck(truck_id):
     if 'user_id' not in session:
         flash("Please log in to book a vehicle.")
-        return redirect(url_for('login'))
+        return redirect(url_for('login_customer'))
+
+    # STRICT SECURITY CHECK: Block Owners from booking vehicles!
+    if session.get('role') == 'owner':
+        flash("Action Denied: Fleet Owners cannot book vehicles. Please log in as a Customer to make a reservation.")
+        return redirect(url_for('catalog'))
 
     db = get_db_connection()
     truck = db.execute('SELECT * FROM trucks WHERE id = ?', (truck_id,)).fetchone()
@@ -240,7 +309,7 @@ def book_truck(truck_id):
 def my_bookings():
     if 'user_id' not in session:
         flash("Please log in to view your booking history.")
-        return redirect(url_for('login'))
+        return redirect(url_for('login_customer'))
 
     db = get_db_connection()
     user_bookings = db.execute('''
@@ -252,8 +321,7 @@ def my_bookings():
     ''', (session['user_id'],)).fetchall()
 
     is_owner = False
-    truck_count = db.execute('SELECT COUNT(*) FROM trucks WHERE owner_id = ?', (session['user_id'],)).fetchone()[0]
-    if truck_count > 0:
+    if session.get('role') == 'owner':
         is_owner = True
 
     db.close()
@@ -266,7 +334,7 @@ def my_bookings():
 @app.route('/edit_truck/<int:truck_id>', methods=['GET', 'POST'])
 def edit_truck(truck_id):
     if 'user_id' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('login_owner'))
 
     db = get_db_connection()
     truck = db.execute('SELECT * FROM trucks WHERE id = ? AND owner_id = ?', (truck_id, session['user_id'])).fetchone()
@@ -298,7 +366,7 @@ def edit_truck(truck_id):
 @app.route('/delete_truck/<int:truck_id>', methods=['POST'])
 def delete_truck(truck_id):
     if 'user_id' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('login_owner'))
 
     db = get_db_connection()
     truck = db.execute('SELECT * FROM trucks WHERE id = ? AND owner_id = ?', (truck_id, session['user_id'])).fetchone()
@@ -326,7 +394,7 @@ def delete_truck(truck_id):
 @app.route('/toggle_maintenance/<int:truck_id>', methods=['POST'])
 def toggle_maintenance(truck_id):
     if 'user_id' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('login_owner'))
 
     db = get_db_connection()
     truck = db.execute('SELECT is_maintenance FROM trucks WHERE id = ? AND owner_id = ?', (truck_id, session['user_id'])).fetchone()
