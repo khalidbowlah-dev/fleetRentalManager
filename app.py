@@ -363,7 +363,6 @@ def edit_truck(truck_id):
 
     db.close()
     return render_template('edit_truck.html', truck=truck)
-# [US4] Vehicle Maintenance State: Toggles a truck offline/online
 
 @app.route('/delete_truck/<int:truck_id>', methods=['POST'])
 def delete_truck(truck_id):
@@ -392,7 +391,7 @@ def delete_truck(truck_id):
 
     flash("Vehicle successfully removed from the fleet.")
     return redirect(url_for('dashboard'))
-
+#  [US4] Vehicle Maintenance State: Toggles a truck offline/online
 @app.route('/toggle_maintenance/<int:truck_id>', methods=['POST'])
 def toggle_maintenance(truck_id):
     if 'user_id' not in session:
