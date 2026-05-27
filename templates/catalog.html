@@ -19,7 +19,7 @@
         <a href="/my_bookings"><button style="background-color: #3498db; margin: 0;">My Receipts</button></a>
         <a href="/logout"><button style="background-color: #e74c3c; margin: 0;">Logout</button></a>
         {% else %}
-        <a href="/login"><button style="margin: 0;">Login / Register</button></a>
+        <a href="/"><button style="margin: 0;">Login / Register</button></a>
         {% endif %}
     </div>
 </div>
@@ -50,11 +50,17 @@
         </td>
         <td>
             {% if truck['status'] == 'Available' %}
-            {% if session.username %}
+
+            {% if is_owner %}
+            <span style="color: #95a5a6; font-style: italic;">View Only</span>
+
+            {% elif session.username %}
             <a href="/book/{{ truck['id'] }}" style="padding: 8px 15px; background-color: #3498db; color: white; border-radius: 4px; text-decoration: none;">Book Now</a>
+
             {% else %}
-            <a href="/login" style="padding: 8px 15px; background-color: #e67e22; color: white; border-radius: 4px; text-decoration: none;">Login to Book</a>
+            <a href="/login_customer" style="padding: 8px 15px; background-color: #e67e22; color: white; border-radius: 4px; text-decoration: none;">Login to Book</a>
             {% endif %}
+
             {% else %}
             <span style="color: #95a5a6;">Unavailable</span>
             {% endif %}
