@@ -363,6 +363,7 @@ def edit_truck(truck_id):
 
     db.close()
     return render_template('edit_truck.html', truck=truck)
+# [US4] Vehicle Maintenance State: Toggles a truck offline/online
 
 @app.route('/delete_truck/<int:truck_id>', methods=['POST'])
 def delete_truck(truck_id):
