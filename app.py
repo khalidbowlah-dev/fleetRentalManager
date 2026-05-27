@@ -304,7 +304,7 @@ def book_truck(truck_id):
 
 # ==========================================
 # USER RENTAL HISTORY PANEL
-# ==========================================
+# [US5] Customer Rental History: Fetches active and past receipts
 
 @app.route('/my_bookings')
 def my_bookings():
