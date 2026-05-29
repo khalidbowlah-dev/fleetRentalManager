@@ -263,6 +263,7 @@ def book_truck(truck_id):
 
     db = get_db_connection()
     truck = db.execute('SELECT * FROM trucks WHERE id = ?', (truck_id,)).fetchone()
+    today_str = datetime.now().strftime('%Y-%m-%d')
 
     if request.method == 'POST':
         start_str = request.form['start_date']
@@ -270,6 +271,15 @@ def book_truck(truck_id):
 
         start_date = datetime.strptime(start_str, '%Y-%m-%d')
         end_date = datetime.strptime(end_str, '%Y-%m-%d')
+
+        # --- NEW VALIDATION: BLOCK PAST DATES ---
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        if start_date < today:
+            flash("Error: You cannot book a start date in the past!")
+            db.close()
+            return redirect(url_for('book_truck', truck_id=truck_id))
+        # ----------------------------------------
+
         days = (end_date - start_date).days
 
         if days <= 0:
@@ -300,7 +310,7 @@ def book_truck(truck_id):
         return redirect(url_for('my_bookings'))
 
     db.close()
-    return render_template('book.html', truck=truck)
+    return render_template('book.html', truck=truck, today_str=today_str)
 
 # ==========================================
 # USER RENTAL HISTORY PANEL
@@ -325,8 +335,10 @@ def my_bookings():
     if session.get('role') == 'owner':
         is_owner = True
 
+    today_str = datetime.now().strftime('%Y-%m-%d')
+
     db.close()
-    return render_template('my_bookings.html', bookings=user_bookings, is_owner=is_owner)
+    return render_template('my_bookings.html', bookings=user_bookings, is_owner=is_owner, today_str=today_str)
 
 # ==========================================
 # CRUD: UPDATE & DELETE ROUTES
@@ -391,7 +403,8 @@ def delete_truck(truck_id):
 
     flash("Vehicle successfully removed from the fleet.")
     return redirect(url_for('dashboard'))
-#  [US4] Vehicle Maintenance State: Toggles a truck offline/online
+
+# [US4] Vehicle Maintenance State: Toggles a truck offline/online
 @app.route('/toggle_maintenance/<int:truck_id>', methods=['POST'])
 def toggle_maintenance(truck_id):
     if 'user_id' not in session:

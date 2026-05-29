@@ -24,6 +24,7 @@
         <th>Daily Rate</th>
         <th>Pick-Up Date</th>
         <th>Return Date</th>
+        <th>Status</th>
         <th>Total Cost</th>
     </tr>
 
@@ -34,11 +35,22 @@
         <td>${{ "%.2f"|format(booking['daily_rate']) }}</td>
         <td>{{ booking['start_date'] }}</td>
         <td>{{ booking['end_date'] }}</td>
+
+        <td>
+            {% if booking['end_date'] < today_str %}
+            <span style="color: #95a5a6; font-style: italic;">Completed</span>
+            {% elif booking['start_date'] > today_str %}
+            <span style="color: #3498db; font-weight: bold;">Upcoming</span>
+            {% else %}
+            <span style="color: #2ecc71; font-weight: bold;">Active</span>
+            {% endif %}
+        </td>
+
         <td style="color: #2ecc71; font-weight: bold;">${{ "%.2f"|format(booking['total_cost']) }}</td>
     </tr>
     {% else %}
     <tr>
-        <td colspan="6" style="text-align: center;">You have not made any active fleet reservations yet. Go to the catalog to book a vehicle!</td>
+        <td colspan="7" style="text-align: center;">You have not made any fleet reservations yet. Go to the catalog to book a vehicle!</td>
     </tr>
     {% endfor %}
 </table>

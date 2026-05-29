@@ -16,7 +16,7 @@
 
 <form action="/book/{{ truck['id'] }}" method="POST">
     <label>Pick-Up Date:</label>
-    <input type="date" name="start_date" required>
+    <input type="date" name="start_date" value="{{ today_str }}" required>
 
     <label>Return Date:</label>
     <input type="date" name="end_date" required>
@@ -25,6 +25,6 @@
 </form>
 
 <br>
-<a href="/">Cancel and Return Home</a>
+<a href="/catalog">Cancel and Return Home</a>
 </body>
 </html>
